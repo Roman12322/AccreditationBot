@@ -1,3 +1,4 @@
+import pandas as pd
 import telebot
 from config import TG_API_KEY
 from model_config import Model
@@ -6,14 +7,14 @@ from model_config import Model
 class Bot_Messages:
     def __init__(self):
         self.welcome_message = 'Привет, Я Бот-помощник от "Росаккредитация"'
-        self.information_message = 'Для взаимодейтсвтя со мной необходимо ввести наимнование продукта и качестве\n' \
+        self.information_message = 'Для взаимодействия со мной необходимо ввести наименование продукта и качество\n' \
                                    'Например: "Детские игрушки" -> Рекомендация по сертификации'
         self.help_message = 'Если возник экстренный вопрос - обратитесь за помощью по номеру +71112223344'
         self.check_product_message = 'Необходимо вводить полное наименование продукта:\n' \
-                                     'Изделия детские санитарно-гигиенические из полимерных материалов (100% ' \
+                                     'Изделия детские санитарно-гигиенические из полимерных материалов (10% ' \
                                      'полипропилен) для ухода за детьми'
         self.incorrect_data = 'Были введены некорректные данные, попробуйте ввести данные в следующем формета:\n' \
-                              '"Изделия детские санитарно-гигиенические из полимерных материалов (100% ' \
+                              '"Изделия детские санитарно-гигиенические из полимерных материалов (10% ' \
                               'полипропилен) для ухода за детьми"'
 
 
@@ -32,7 +33,7 @@ def start(message):
 
 
 @bot.message_handler(content_types=['text'])
-def ask_question(message):
+def handle_text_question(message):
     if message.text == "Инструкция по применению":
         bot.send_message(message.chat.id, text=Bot_Messages().information_message)
     elif message.text == "Экстренная помощь":
@@ -41,24 +42,31 @@ def ask_question(message):
     elif message.text == "Проверить продукт":
         bot.send_message(message.chat.id, text=Bot_Messages().check_product_message)
 
-    # elif message.text == "Как меня зовут?":
-    #     bot.send_message(message.chat.id, "У меня нет имени..")
-    #
-    # elif message.text == "Что я могу?":
-    #     bot.send_message(message.chat.id, text="Поздороваться с читателями")
-    #
-    # elif message.text == "Вернуться в главное меню":
-    #     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    #     button1 = telebot.types.KeyboardButton("👋 Поздороваться")
-    #     button2 = telebot.types.KeyboardButton("❓ Задать вопрос")
-    #     markup.add(button1, button2)
-    #     bot.send_message(message.chat.id, text="Вы вернулись в главное меню", reply_markup=markup)
     else:
         model = Model(model_name=model_name)
         if len(message.text) > 0:
-            bot.send_message(message.chat.id, text=f"Eqt list: {model.get_recommendation(query=message.text)}")
+            bot.send_message(message.chat.id, text=f"{model.get_recommendation_card(query=message.text)}")
         else:
             bot.send_message(message.chat.id, text=Bot_Messages().incorrect_data)
+
+
+@bot.message_handler(content_types=['document'])
+def handle_docs(message):
+    file_info = bot.get_file(message.document.file_id)
+    downloaded_file = bot.download_file(file_info.file_path)
+
+    src = f'{file_info.file_path}'
+    with open(src, 'wb') as new_file:
+        new_file.write(downloaded_file)
+
+    model = Model(model_name=model_name)
+    file = model.preprocess_input_user_file(path=src)
+
+    filepath = 'documents/new_uploading.csv'
+    file.to_csv(filepath)
+    nfile_uploading = open(filepath, 'rb')
+
+    bot.send_document(message.chat.id, document=nfile_uploading)
 
 
 bot.polling(none_stop=True)
